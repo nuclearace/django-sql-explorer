@@ -48,10 +48,10 @@ class Query(models.Model):
         A lightweight version of .execute to just check the validity of the SQL.
         Skips the processing associated with QueryResult.
         """
-        QueryResult(self.final_sql())
+        QueryResult(self.final_sql(), db=self._state.db)
 
     def execute(self):
-        ret = QueryResult(self.final_sql())
+        ret = QueryResult(self.final_sql(), db=self._state.db)
         ret.process()
         return ret
 
@@ -115,9 +115,10 @@ class QueryLog(models.Model):
 
 class QueryResult(object):
 
-    def __init__(self, sql):
+    def __init__(self, sql, db=None):
 
         self.sql = sql
+        self._db = db
 
         cursor, duration = self.execute_query()
 
@@ -142,7 +143,7 @@ class QueryResult(object):
         return [ColumnHeader(d[0]) for d in self._description] if self._description else [ColumnHeader('--')]
 
     def _get_numerics(self):
-        conn = get_connection()
+        conn = get_connection(db=self._db)
         if hasattr(conn.Database, "NUMBER"):
             return [ix for ix, c in enumerate(self._description) if hasattr(c, 'type_code') and c.type_code in conn.Database.NUMBER.values]
         elif self.data:
@@ -184,7 +185,7 @@ class QueryResult(object):
                 r[ix] = t.format(str(r[ix]))
 
     def execute_query(self):
-        conn = get_connection()
+        conn = get_connection(db=self._db)
         cursor = conn.cursor()
         start_time = time()
 

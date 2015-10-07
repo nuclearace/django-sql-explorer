@@ -27,7 +27,9 @@ def passes_blacklist(sql):
     return not any(write_word in clean.upper() for write_word in app_settings.EXPLORER_SQL_BLACKLIST)
 
 
-def get_connection():
+def get_connection(db=None):
+    if db is not None:
+        return connections[db]
     return connections[app_settings.EXPLORER_CONNECTION_NAME] if app_settings.EXPLORER_CONNECTION_NAME else connection
 
 
