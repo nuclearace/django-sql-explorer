@@ -4,7 +4,7 @@
 {% block sql_explorer_navlinks %}
     {% if can_change %}
       <li{% if not query %} class="active" {% endif %}><a href="{% url "query_create" %}">New Query</a></li>
-      <li><a href="{% url "explorer_playground" %}">Playground</a></li>
+      <!--li><a href="{% url "explorer_playground" %}">Playground</a></li-->
     {% endif %}
     {% if query %}<li class="active"><a href="">Query Detail</a></li>{% endif %}
     <li><a href="{% url "explorer_logs" %}">Logs</a></li>

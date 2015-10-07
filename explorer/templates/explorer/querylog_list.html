@@ -5,7 +5,7 @@
 {% block sql_explorer_navlinks %}
     {% if can_change %}
       <li><a href="{% url "query_create" %}">New Query</a></li>
-      <li><a href="{% url "explorer_playground" %}">Playground</a></li>
+      <!--li><a href="{% url "explorer_playground" %}">Playground</a></li-->
       <li class="active"><a href="">Logs</a></li>
     {% endif %}
 {% endblock %}
@@ -19,7 +19,7 @@
                 <th>Run By</th>
                 <th width="33%">SQL</th>
                 <th>Query ID</th>
-                <th>Playground</th>
+                <!--th>Playground</th-->
             </tr>
         </thead>
         <tbody>
@@ -29,7 +29,7 @@
                 <td>{{ object.run_by_user.email }}</td>
                 <td class="log-sql">{{ object.sql }}</td>
                 <td> {% if object.query_id %}<a href="{% url "query_detail" object.query_id %}">Query {{ object.query_id }}</a>{% elif object.is_playground %}Playground{% else %}--{% endif %}</td>
-                <td><a href="{% url "explorer_playground" %}?querylog_id={{ object.id }}">Open</a></td>
+                <!--td><a href="{% url "explorer_playground" %}?querylog_id={{ object.id }}">Open</a></td-->
             </tr>
             {% endfor %}
         </tbody>
