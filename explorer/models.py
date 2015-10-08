@@ -105,9 +105,9 @@ class QueryLog(models.Model):
         last_log_sql = last_log.sql if last_log else None
         return last_log_sql != self.sql
 
-    @property
-    def is_playground(self):
-        return self.query_id is None
+    #@property
+    # def is_playground(self):
+    #     return self.query_id is None
 
     class Meta:
         ordering = ['-run_at']
