@@ -1,7 +1,8 @@
+from django.db import DatabaseError
 from django.forms import ModelForm, Field, ValidationError, BooleanField
 from django.forms.widgets import CheckboxInput
+
 from explorer.models import Query, MSG_FAILED_BLACKLIST
-from django.db import DatabaseError
 
 _ = lambda x: x
 
@@ -17,11 +18,13 @@ class SqlField(Field):
 
         query = Query(sql=value)
 
-        error = MSG_FAILED_BLACKLIST if not query.passes_blacklist() else None
+        passes_blacklist, failing_words = query.passes_blacklist()
+
+        error = MSG_FAILED_BLACKLIST % ', '.join(failing_words) if not passes_blacklist else None
 
         if not error and not query.available_params():
             try:
-                query.try_execute()
+                query.execute_query_only()
             except DatabaseError as e:
                 error = str(e)
 
@@ -46,10 +49,6 @@ class QueryForm(ModelForm):
     def created_by_user_email(self):
         return self.instance.created_by_user.email if self.instance.created_by_user else '--'
 
-    @property
-    def created_by_user_id(self):
-        return self.instance.created_by_user.id if self.instance.created_by_user else ''
-
     class Meta:
         model = Query
-        fields = ['title', 'sql', 'description', 'created_by_user', 'snapshot']
+        fields = ['title', 'sql', 'description', 'snapshot']

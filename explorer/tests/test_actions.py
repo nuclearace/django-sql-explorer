@@ -1,23 +1,11 @@
 import io
-
 from django.test import TestCase
 from explorer.actions import generate_report_action
 from explorer.tests.factories import SimpleQueryFactory
-from explorer.utils import csv_report
 from zipfile import ZipFile
 
 
-class testSqlQueryActions(TestCase):
-
-    def test_simple_query_runs(self):
-
-        expected_csv = 'two\r\n2\r\n'
-
-        r = SimpleQueryFactory()
-        result = csv_report(r).getvalue()
-
-        self.assertIsNotNone(result, "Query '%s' returned None." % r.title)
-        self.assertEqual(result.lower(), expected_csv)
+class TestSqlQueryActions(TestCase):
 
     def test_single_query_is_csv_file(self):
         expected_csv = b'two\r\n2\r\n'

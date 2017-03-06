@@ -10,45 +10,6 @@
     transition: height 0.01s ease;
 }
 
-.query-list {
-    table-layout: fixed;
-}
-
-.query-area h2 {
-    padding-bottom: 20px;
-}
-
-.sql-panel {
-    margin-top: 30px;
-}
-
-.tip {
-    text-align: right;
-    margin-top: -20px;
-}
-
-.btn-group-wrap {
-    text-align: center;
-}
-
-.schema-frame {
-    display: none;
-    top: 43px;
-}
-
-#hide_schema_button {
-    display: none;
-}
-
-.charts {
-    overflow: auto;
-    height: 500px;
-}
-
-.row-control {
-    float: right;
-}
-
 .rows-input {
     text-align: center;
     width: 40px;
@@ -58,56 +19,37 @@
     overflow: auto; height: 500px;
 }
 
+.list-search {
+    margin-top: 20px;
+}
+
 .data-headers {
     background: white;
 }
 
-.center {
-    text-align: center;
-}
-
 .log-sql {
     word-wrap: break-word;
+    white-space: normal !important;
 }
 
 .list {
     -webkit-padding-start: 0px;
-}
-
-#footer {
-    padding-top: 20px;
+    list-style: none;
 }
 
 .wrap {
-    overflow: hidden; /* for schema navigator */
+    padding-bottom: 15rem; /* ensure space for drop down buttons */
 }
 
-.icon-cell {
-    padding: 2px 0 0 45px;
-    vertical-align: middle;
-}
-
-.icon-cell a {
-    font-size: 20px;
-}
-
-.search {
-    width: 250px;
-    margin-top: 30px;
-    margin-left: 30px;
-}
-
-.querylist-header {
-    float: left;
+.schema-wrapper {
+    overflow: hidden;
 }
 
 .toggle {
-    text-decoration: underline;
     cursor: pointer;
-    color: #428bca;
 }
 
-.indented {
+td.name.indented {
     padding-left: 30px;
 }
 
@@ -133,5 +75,97 @@
 
 .stats-expand {
     cursor: pointer;
-    height: 20px;
+    padding-left: 5px;
+}
+
+.data-row {
+    white-space: pre;
+}
+
+.CodeMirror {
+    height: 400px;
+}
+
+.table>thead>tr>th.preview-header {
+    vertical-align: top;
+}
+
+span.sort {
+    background: url('//cdn.datatables.net/1.10.0/images/sort_both.png') no-repeat;
+    cursor: pointer;
+    padding-left: 20px;
+}
+
+.pivot-table {
+    padding: 15px;
+}
+
+.pvtAxisContainer, .pvtVals {
+    border-color: #ddd;
+}
+
+#schema_frame {
+    width: 100%;
+    border: 0;
+}
+
+.schema-header {
+    cursor: pointer;
+}
+
+.CodeMirror-lines .inserted {
+    animation: inserted-pulse 700ms;
+}
+
+@keyframes inserted-pulse {
+    0% {
+        background-color: #f9f2f4;
+        color: #c7254e;
+        font-weight: bold;
+    }
+    100% {
+        background-color: transparent;
+        color: inherit;
+        font-weight: normal;
+    }
+}
+
+.dropdown-menu {
+    z-index: 9999;
+}
+
+.dropdown-menu>li>input {
+    display: block;
+    padding: 3px 20px;
+    clear: both;
+    font-weight: 400;
+    line-height: 1.42857143;
+    color: #333;
+    white-space: nowrap;
+    width: 100%;
+    text-align: left;
+}
+
+.dropdown-menu>li>input:hover {
+    color: #262626;
+    text-decoration: none;
+    background-color: #f5f5f5;
+}
+
+a#fullscreen {
+    padding-left: 1rem;
+}
+
+.counter {
+    display: none;
+    background-color: #ecf0f1;
+    font-family: monospace;
+}
+
+.name a {
+    text-decoration: none !important;
+}
+
+.sql {
+    width: 33%;
 }
