@@ -1,16 +1,77 @@
+1.1.0
+=====
+
+- BREAKING CHANGE: EXPLORER_DATA_EXPORTERS setting is now a list of tuples insead of a dictionary. This only affects you if you have customized this setting. This was to preserve ordering of the export buttons in the UI.
+
+
+1.0.0
+=====
+
+6/16/16
+
+- BREAKING CHANGE: Dropped support for Python 2.6. See .travis.yml for test matrix.
+
+- BREAKING CHANGE: The 'export' methods have all changed. Those these weren't originally designed to be external APIs, folks have written consuming code that directly called export code.
+  If you had code that looked like:
+
+      > explorer.utils.csv_report(query)
+
+  You will now need to do something like:
+
+      > explorer.exporters.get_exporter_class('csv')(query).get_file_output()
+
+- There is a new export system! v1 is shipping with support for CSV, JSON, and Excel (xlsx). The availablility of these can be configured via the EXPLORER_DATA_EXPORTERS setting.
+    - Note that for Excel export to work, you will need to install xlsxwriter from optional-requirements.txt.
+- Introduced Query History link. Find it towards the top right of a saved query.
+- Front end performance improvements and library upgrades.
+- Allow non-admins with permission to log into explorer.
+- Added a proper test_project for an easier entry-point for contributors, or folks who want to kick the tires.
+- Loads of little bugfixes.
+
+0.9.1, 0.9.2
+=====
+
+2/2/2016
+
+- Fixed readme issue (.1) and setup.py issue (.2)
+
+0.9.1
+=====
+
+2/1/2016
+
+- Major changes
+    - Dropped support for Django 1.6, added support for Django 1.9. See .travis.yml for test matrix.
+    - Dropped charted.js & visualization because it didn't work well.
+    - Client-side pivot tables with pivot.js. This is ridiculously cool!
+
+- Minor (but awesome!) changes
+    - Cmd-/ to comment/uncomment a block of SQL
+    - Quick 'shortcut' links to the corresponding querylog to more quickly share results. Look at the top-right of the editor. Also works for playground!
+    - Prompt for unsaved changes before navigating away
+    - Support for default parameter values via $$paramName:defaultValue$$
+    - Optional Celery task for truncating query logs as entries build up
+    - Display historical average query runtime
+
+    - Increased default number of rows from 100 to 1000
+    - Increased SQL editor size (5 additional visible lines)
+    - CSS cleanup and streamlining (making better use of foundation)
+    - Various bugfixes (blacklist not enforced on playground being the big one)
+    - Upgraded front-end libraries
+    - Hide Celery-based features if tasks not enabled.
+
 0.8.0
 =====
 
-Sometime in October, 2015
+10/21/2015
 
-- Snapshots!
-- Async queries + email!
-- Run counts!
-- Column Statistics!
-- Python 3!
-- Django 1.9!
-- Delimiters!
-- Listings respect permissions!
+- Snapshots! Dump the csv results of a query to S3 on a regular schedule. More details in readme.rst under 'features'.
+- Async queries + email! If you have a query that takes a long time to run, execute it in the background and Explorer will send you an email with the results when they are ready. More details in readme.rst
+- Run counts! Explorer inspects the query log to see how many times a query has been executed.
+- Column Statistics! Click the ... on top of numeric columns in the results pane to see min, max, avg, sum, count, and missing values.
+- Python 3! - Django 1.9!
+- Delimiters! Export with delimiters other than commas.
+- Listings respect permissions! If you've given permission to queries to non-admins, they will see only those queries on the listing page.
 
 0.7.0
 =====

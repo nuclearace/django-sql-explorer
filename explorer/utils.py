@@ -1,21 +1,12 @@
-
-
 import functools
-import sys
-PY3 = sys.version_info[0] == 3
-
-if PY3:
-    import csv
-else:
-    import unicodecsv as csv
-import json
 import re
-import string
-from explorer import app_settings
-from django.db import connections, connection, models, DatabaseError
-from django.http import HttpResponse
-from six.moves import cStringIO
+from django.db import connections, connection
+
+from six import text_type
+
 import sqlparse
+
+from . import app_settings
 
 EXPLORER_PARAM_TOKEN = "$$"
 
@@ -23,52 +14,15 @@ EXPLORER_PARAM_TOKEN = "$$"
 
 
 def passes_blacklist(sql):
-    clean = functools.reduce(lambda sql, term: sql.upper().replace(term, ""), app_settings.EXPLORER_SQL_WHITELIST, sql)
-    return not any(write_word in clean.upper() for write_word in app_settings.EXPLORER_SQL_BLACKLIST)
+    clean = functools.reduce(lambda sql, term: sql.upper().replace(term, ""), [t.upper() for t in app_settings.EXPLORER_SQL_WHITELIST], sql)
+    fails = [bl_word for bl_word in app_settings.EXPLORER_SQL_BLACKLIST if bl_word in clean.upper()]
+    return not any(fails), fails
 
 
 def get_connection(db=None):
     if db is not None:
         return connections[db]
     return connections[app_settings.EXPLORER_CONNECTION_NAME] if app_settings.EXPLORER_CONNECTION_NAME else connection
-
-
-def schema_info():
-    """
-    Construct schema information via introspection of the django models in the database.
-
-    :return: Schema information of the following form, sorted by db_table_name.
-        [
-            ("package.name -> ModelClass", "db_table_name",
-                [
-                    ("db_column_name", "DjangoFieldType"),
-                    (...),
-                ]
-            )
-        ]
-
-    """
-
-    ret = []
-    apps = [a for a in models.get_apps() if a.__package__ not in app_settings.EXPLORER_SCHEMA_EXCLUDE_APPS]
-    for app in apps:
-        for model in models.get_models(app):
-            friendly_model = "%s -> %s" % (app.__package__, model._meta.object_name)
-            ret.append((
-                          friendly_model,
-                          model._meta.db_table,
-                          [_format_field(f) for f in model._meta.fields]
-                      ))
-
-            # Do the same thing for many_to_many fields. These don't show up in the field list of the model
-            # because they are stored as separate "through" relations and have their own tables
-            ret += [(
-                       friendly_model,
-                       m2m.rel.through._meta.db_table,
-                       [_format_field(f) for f in m2m.rel.through._meta.fields]
-                    ) for m2m in model._meta.many_to_many]
-
-    return sorted(ret, key=lambda t: t[1])
 
 
 def _format_field(field):
@@ -82,74 +36,28 @@ def param(name):
 def swap_params(sql, params):
     p = params.items() if params else {}
     for k, v in p:
-        sql = sql.replace(param(k), str(v))
+        regex = re.compile("\$\$%s(?:\:([^\$]+))?\$\$" % str(k).lower(), re.I)
+        sql = regex.sub(text_type(v), sql)
     return sql
 
 
 def extract_params(text):
-    regex = re.compile("\$\$([a-zA-Z0-9_|-]+)\$\$")
-    params = re.findall(regex, text)
-    return dict(zip(params, ['' for i in range(len(params))]))
-
-
-def write_csv(headers, data, delim=None):
-    if delim and len(delim) == 1 or delim == 'tab':
-        delim = '\t' if delim == 'tab' else str(delim)
-    else:
-        delim = app_settings.CSV_DELIMETER
-    csv_data = cStringIO()
-    if PY3:
-        writer = csv.writer(csv_data, delimiter=delim)
-    else:
-        writer = csv.writer(csv_data, delimiter=delim, encoding='utf-8')
-    writer.writerow(headers)
-    for row in data:
-        writer.writerow([s for s in row])
-    return csv_data
-
-
-def get_filename_for_title(title):
-    # build list of valid chars, build filename from title and replace spaces
-    valid_chars = '-_.() %s%s' % (string.ascii_letters, string.digits)
-    filename = ''.join(c for c in title if c in valid_chars)
-    filename = filename.replace(' ', '_')
-    return filename
-
-
-def build_stream_response(query, delim=None):
-    data = csv_report(query, delim).getvalue()
-    response = HttpResponse(data, content_type='text')
-    return response
-
-
-def build_download_response(query, delim=None):
-    data = csv_report(query, delim).getvalue()
-    response = HttpResponse(data, content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="%s.csv"' % (
-        get_filename_for_title(query.title)
-    )
-    response['Content-Length'] = len(data)
-    return response
-
-
-def csv_report(query, delim=None):
-    try:
-        res = query.execute()
-        return write_csv(res.headers, res.data, delim)
-    except DatabaseError as e:
-        return str(e)
+    regex = re.compile("\$\$([a-z0-9_]+)(?:\:([^\$]+))?\$\$")
+    params = re.findall(regex, text.lower())
+    # We support Python 2.6 so can't use a dict comprehension
+    return dict(zip([p[0] for p in params], [p[1] if len(p) > 1 else '' for p in params]))
 
 
 # Helpers
-from django.contrib.admin.forms import AdminAuthenticationForm
+from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.views import login
 from django.contrib.auth import REDIRECT_FIELD_NAME
 
 
-def safe_admin_login_prompt(request):
+def safe_login_prompt(request):
     defaults = {
         'template_name': 'admin/login.html',
-        'authentication_form': AdminAuthenticationForm,
+        'authentication_form': AuthenticationForm,
         'extra_context': {
             'title': 'Log in',
             'app_path': request.get_full_path(),
@@ -173,21 +81,27 @@ def safe_cast(val, to_type, default=None):
         return default
 
 
-def safe_json(val):
-    try:
-        return json.loads(val)
-    except ValueError:
-        return None
-
-
 def get_int_from_request(request, name, default):
     val = request.GET.get(name, default)
     return safe_cast(val, int, default) if val else None
 
 
-def get_json_from_request(request, name):
-    val = request.GET.get(name, None)
-    return safe_json(val) if val else None
+def get_params_from_request(request):
+    val = request.GET.get('params', None)
+    try:
+        d = {}
+        tuples = val.split('|')
+        for t in tuples:
+            res = t.split(':')
+            d[res[0]] = res[1]
+        return d
+    except Exception:
+        return None
+
+
+def get_params_for_url(query):
+    if query.params:
+        return '|'.join(['%s:%s' % (p, v) for p, v in query.params.items()])
 
 
 def url_get_rows(request):
@@ -206,15 +120,19 @@ def url_get_show(request):
     return bool(get_int_from_request(request, 'show', 1))
 
 
+def url_get_fullscreen(request):
+    return bool(get_int_from_request(request, 'fullscreen', 0))
+
+
 def url_get_params(request):
-    return get_json_from_request(request, 'params')
+    return get_params_from_request(request)
 
 
 def allowed_query_pks(user_id):
     return app_settings.EXPLORER_GET_USER_QUERY_VIEWS().get(user_id, [])
 
 
-def user_can_see_query(request, kwargs):
+def user_can_see_query(request, **kwargs):
     if not request.user.is_anonymous() and 'query_id' in kwargs:
         return int(kwargs['query_id']) in allowed_query_pks(request.user.id)
     return False

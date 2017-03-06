@@ -1,13 +1,23 @@
-from explorer.utils import passes_blacklist, swap_params, extract_params, shared_dict_update, get_connection, get_s3_connection
-from django.db import models, DatabaseError
-from time import time
-from django.core.urlresolvers import reverse
-from django.conf import settings
-from . import app_settings
 import logging
+from time import time
 import six
 
-MSG_FAILED_BLACKLIST = "Query failed the SQL blacklist."
+from django.db import models, DatabaseError
+from django.core.urlresolvers import reverse
+from django.conf import settings
+
+from . import app_settings
+from explorer.utils import (
+    passes_blacklist,
+    swap_params,
+    extract_params,
+    shared_dict_update,
+    get_connection,
+    get_s3_connection,
+    get_params_for_url
+)
+
+MSG_FAILED_BLACKLIST = "Query failed the SQL blacklist: %s"
 
 
 logger = logging.getLogger(__name__)
@@ -37,21 +47,27 @@ class Query(models.Model):
     def get_run_count(self):
         return self.querylog_set.count()
 
+    def avg_duration(self):
+        return self.querylog_set.aggregate(models.Avg('duration'))['duration__avg']
+
     def passes_blacklist(self):
         return passes_blacklist(self.final_sql())
 
     def final_sql(self):
-        return swap_params(self.sql, self.params)
+        return swap_params(self.sql, self.available_params())
 
-    def try_execute(self):
-        """
-        A lightweight version of .execute to just check the validity of the SQL.
-        Skips the processing associated with QueryResult.
-        """
-        QueryResult(self.final_sql(), db=self._state.db)
+    def execute_query_only(self):
+        return QueryResult(self.final_sql(), db=self._state.db)
+
+    def execute_with_logging(self, executing_user):
+        ql = self.log(executing_user)
+        ret = self.execute()
+        ql.duration = ret.duration
+        ql.save()
+        return ret, ql
 
     def execute(self):
-        ret = QueryResult(self.final_sql(), db=self._state.db)
+        ret = self.execute_query_only()
         ret.process()
         return ret
 
@@ -71,8 +87,16 @@ class Query(models.Model):
     def get_absolute_url(self):
         return reverse("query_detail", kwargs={'query_id': self.id})
 
+    @property
+    def params_for_url(self):
+        return get_params_for_url(self)
+
     def log(self, user=None):
-        QueryLog(sql=self.sql, query_id=self.id, run_by_user=user).save()
+        if user and user.is_anonymous():
+            user = None
+        ql = QueryLog(sql=self.final_sql(), query_id=self.id, run_by_user=user)
+        ql.save()
+        return ql
 
     @property
     def shared(self):
@@ -92,22 +116,11 @@ class QueryLog(models.Model):
     query = models.ForeignKey(Query, null=True, blank=True, on_delete=models.SET_NULL)
     run_by_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True)
     run_at = models.DateTimeField(auto_now_add=True)
+    duration = models.FloatField(blank=True, null=True)  # milliseconds
 
-    def save(self, **kwargs):
-        self.sql = self.sql if self.sql and self.should_save_sql() else None
-        super(QueryLog, self).save(**kwargs)
-
-    def should_save_sql(self):
-        # If the querylog already has been saved, then the sql should always be saved.
-        if self.id:
-            return bool(self.sql)
-        last_log = QueryLog.objects.filter(query_id=self.query_id).order_by('-run_at').first()
-        last_log_sql = last_log.sql if last_log else None
-        return last_log_sql != self.sql
-
-    #@property
-    # def is_playground(self):
-    #     return self.query_id is None
+    @property
+    def is_playground(self):
+        return self.query_id is None
 
     class Meta:
         ordering = ['-run_at']
@@ -139,6 +152,10 @@ class QueryResult(object):
     def headers(self):
         return self._headers or []
 
+    @property
+    def header_strings(self):
+        return [str(h) for h in self.headers]
+
     def _get_headers(self):
         return [ColumnHeader(d[0]) for d in self._description] if self._description else [ColumnHeader('--')]
 
@@ -149,11 +166,6 @@ class QueryResult(object):
         elif self.data:
             d = self.data[0]
             return [ix for ix, _ in enumerate(self._description) if not isinstance(d[ix], six.string_types) and six.text_type(d[ix]).isnumeric()]
-        return []
-
-    def _get_unicodes(self):
-        if len(self.data):
-            return [ix for ix, c in enumerate(self.data[0]) if type(c) is six.text_type]
         return []
 
     def _get_transforms(self):
@@ -169,20 +181,18 @@ class QueryResult(object):
         self.process_columns()
         self.process_rows()
 
-        logger.info("Explorer Query Processing took in %sms." % ((time() - start_time) * 1000))
+        logger.info("Explorer Query Processing took %sms." % ((time() - start_time) * 1000))
 
     def process_columns(self):
         for ix in self._get_numerics():
             self.headers[ix].add_summary(self.column(ix))
 
     def process_rows(self):
-        unicodes = self._get_unicodes()
         transforms = self._get_transforms()
-        for r in self.data:
-            for u in unicodes:
-                r[u] = r[u].encode('utf-8') if r[u] is not None else r[u]
-            for ix, t in transforms:
-                r[ix] = t.format(str(r[ix]))
+        if transforms:
+            for r in self.data:
+                for ix, t in transforms:
+                    r[ix] = t.format(str(r[ix]))
 
     def execute_query(self):
         conn = get_connection(db=self._db)
@@ -201,7 +211,7 @@ class QueryResult(object):
 class ColumnHeader(object):
 
     def __init__(self, title):
-        self.title = title
+        self.title = title.strip()
         self.summary = None
 
     def add_summary(self, column):
@@ -228,9 +238,6 @@ class ColumnStat(object):
     def __unicode__(self):
         return self.label
 
-    def foo(self):
-        return "foobar"
-
 
 class ColumnSummary(object):
 
@@ -250,8 +257,7 @@ class ColumnSummary(object):
 
     @property
     def stats(self):
-        # dict comprehensions are not supported in Python 2.6, so do this instead
-        return dict((c.label, c.value) for c in self._stats)
+        return {c.label: c.value for c in self._stats}
 
     def __str__(self):
         return str(self._header)

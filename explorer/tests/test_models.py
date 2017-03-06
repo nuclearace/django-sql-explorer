@@ -13,6 +13,10 @@ class TestQueryModel(TestCase):
         q.params = {'foo': 'bar', 'mux': 'qux'}
         self.assertEqual(q.available_params(), {'foo': 'bar'})
 
+    def test_default_params_used(self):
+        q = SimpleQueryFactory(sql="select '$$foo:bar$$';")
+        self.assertEqual(q.available_params(), {'foo': 'bar'})
+
     def test_query_log(self):
         self.assertEqual(0, QueryLog.objects.count())
         q = SimpleQueryFactory()
@@ -22,6 +26,14 @@ class TestQueryModel(TestCase):
         self.assertEqual(log.run_by_user, None)
         self.assertEqual(log.query, q)
         self.assertFalse(log.is_playground)
+
+    def test_query_logs_final_sql(self):
+        q = SimpleQueryFactory(sql="select '$$foo$$';")
+        q.params = {'foo': 'bar'}
+        q.log(None)
+        self.assertEqual(1, QueryLog.objects.count())
+        log = QueryLog.objects.first()
+        self.assertEqual(log.sql, "select 'bar';")
 
     def test_playground_query_log(self):
         query = Query(sql='select 1;', title="Playground")
@@ -44,6 +56,24 @@ class TestQueryModel(TestCase):
             q.log()
         self.assertEqual(q.get_run_count(), expected)
 
+    def test_avg_duration(self):
+        q = SimpleQueryFactory()
+        self.assertIsNone(q.avg_duration())
+        expected = 2.5
+        ql = q.log()
+        ql.duration = 2
+        ql.save()
+        ql = q.log()
+        ql.duration = 3
+        ql.save()
+        self.assertEqual(q.avg_duration(), expected)
+
+    def test_log_saves_duration(self):
+        q = SimpleQueryFactory()
+        res, ql = q.execute_with_logging(None)
+        log = QueryLog.objects.first()
+        self.assertEqual(log.duration, res.duration)
+
     @patch('explorer.models.get_s3_connection')
     def test_get_snapshots_sorts_snaps(self, mocked_conn):
         conn = Mock()
@@ -55,6 +85,12 @@ class TestQueryModel(TestCase):
         self.assertEqual(conn.list.call_count, 1)
         self.assertEqual(snaps[0]['key'], 'bar')
         conn.list.assert_called_once_with('query-%s.snap-' % q.id)
+
+    def test_final_sql_uses_merged_params(self):
+        q = SimpleQueryFactory(sql="select '$$foo:bar$$', '$$qux$$';")
+        q.params = {'qux': 'mux'}
+        expected = "select 'bar', 'mux';"
+        self.assertEqual(q.final_sql(), expected)
 
 
 class TestQueryResults(TestCase):
@@ -73,15 +109,12 @@ class TestQueryResults(TestCase):
     def test_data(self):
         self.assertEqual(self.qr.data, [[1, "qux"]])
 
-    def test_unicode_detection(self):
-        self.assertEqual(self.qr._get_unicodes(), [1])
-
     def test_unicode_with_nulls(self):
         self.qr._headers = [ColumnHeader('num'), ColumnHeader('char')]
         self.qr._description = [("num",), ("char",)]
         self.qr._data = [[2, six.u("a")], [3, None]]
         self.qr.process()
-        self.assertEqual(self.qr.data, [[2, b"a"], [3, None]])
+        self.assertEqual(self.qr.data, [[2, "a"], [3, None]])
 
     def test_summary_gets_built(self):
         self.qr.process()

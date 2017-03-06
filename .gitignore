@@ -11,3 +11,5 @@
 .coverage
 /htmlcov/
 *.orig
+tmp
+venv/
