@@ -159,24 +159,28 @@ Name                                                        Version License
 `unicodecsv <https://github.com/jdunck/python-unicodecsv>`_ 0.14.1  BSD
 =========================================================== ======= ================
 
-- sqlparse is Used for SQL formatting
+- sqlparse is used for SQL formatting
 
 *Python - Optional Dependencies*
 
-=========================================================== ======= ================
-Name                                                        Version License
-=========================================================== ======= ================
-`celery <http://www.celeryproject.org/>`_                   3.1     BSD
-`django-celery <http://www.celeryproject.org/>`_            3.1     BSD
-`Factory Boy <https://github.com/rbarrois/factory_boy>`_    2.6.0   MIT
-`xlsxwriter <http://xlsxwriter.readthedocs.io/>`_           0.8.5   BSD
-`tinys3 <https://github.com/smore-inc/tinys3>`_             0.1.11  MIT
-=========================================================== ======= ================
+==================================================================== ======= ================
+Name                                                                 Version License
+==================================================================== ======= ================
+`celery <http://www.celeryproject.org/>`_                            3.1     BSD
+`django-celery <http://www.celeryproject.org/>`_                     3.1     BSD
+`Factory Boy <https://github.com/rbarrois/factory_boy>`_             2.6.0   MIT
+`xlsxwriter <http://xlsxwriter.readthedocs.io/>`_                    0.8.5   BSD
+`boto <https://github.com/boto/boto>`_                               2.46    MIT
+`xhtml2pdf <https://github.com/xhtml2pdf/xhtml2pdf>`_                0.0.6   Apache
+`django-xhtml2pdf <https://github.com/chrisglass/django-xhtml2pdf>`_ 0.0.3   BSD
+`html5lib <https://github.com/html5lib/html5lib-python>`_            1.0     MIT
+==================================================================== ======= ================
 
 - Factory Boy is required for tests
 - celery is required for the 'email' feature, and for snapshots
-- tinys3 is required for snapshots
+- boto is required for snapshots
 - xlsxwriter is required for Excel export (csv still works fine without it)
+- xhtml2pdf and html5lib are required for PDF export
 
 *JavaScript*
 
@@ -242,6 +246,7 @@ EXPLORER_S3_SECRET_KEY                  S3 Secret Key for snapshot upload       
 EXPLORER_S3_BUCKET                      S3 Bucket for snapshot upload                                                                                   None
 EXPLORER_FROM_EMAIL                     The default 'from' address when using async report email functionality                                          "django-sql-explorer@example.com"
 EXPLORER_DATA_EXPORTERS                 The export buttons to use. Default includes Excel, so xlsxwriter from optional-requirements.txt is needed       [('csv', 'explorer.exporters.CSVExporter'), ('excel', 'explorer.exporters.ExcelExporter'), ('json', 'explorer.exporters.JSONExporter')]
+EXPLORER_UNSAFE_RENDERING               Disable autoescaping for the rendering of values from the database. Enable this if you like XSS attacks...      False
 ======================================= =============================================================================================================== ================================================================================================================================================
 
 Release Process

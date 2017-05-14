@@ -1,9 +1,13 @@
+import django
 import logging
 from time import time
 import six
 
 from django.db import models, DatabaseError
-from django.core.urlresolvers import reverse
+if django.VERSION[1] >= 10:
+    from django.urls import reverse
+else:
+    from django.core.urlresolvers import reverse
 from django.conf import settings
 
 from . import app_settings
@@ -13,7 +17,7 @@ from explorer.utils import (
     extract_params,
     shared_dict_update,
     get_connection,
-    get_s3_connection,
+    get_s3_bucket,
     get_params_for_url
 )
 
@@ -27,7 +31,7 @@ class Query(models.Model):
     title = models.CharField(max_length=255)
     sql = models.TextField()
     description = models.TextField(null=True, blank=True)
-    created_by_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True)
+    created_by_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     last_run_date = models.DateTimeField(auto_now=True)
     snapshot = models.BooleanField(default=False, help_text="Include in snapshot task (if enabled)")
@@ -105,16 +109,25 @@ class Query(models.Model):
     @property
     def snapshots(self):
         if app_settings.ENABLE_TASKS:
-            conn = get_s3_connection()
-            res = conn.list('query-%s.snap-' % self.id)
-            return sorted(res, key=lambda s: s['last_modified'])
+            b = get_s3_bucket()
+            keys = b.list(prefix='query-%s.snap-' % self.id)
+            keys_s = sorted(keys, key=lambda k: k.last_modified)
+            return [SnapShot(k.generate_url(expires_in=0, query_auth=False),
+                             k.last_modified) for k in keys_s]
+
+
+class SnapShot(object):
+
+    def __init__(self, url, last_modified):
+        self.url = url
+        self.last_modified = last_modified
 
 
 class QueryLog(models.Model):
 
     sql = models.TextField(null=True, blank=True)
     query = models.ForeignKey(Query, null=True, blank=True, on_delete=models.SET_NULL)
-    run_by_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True)
+    run_by_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE)
     run_at = models.DateTimeField(auto_now_add=True)
     duration = models.FloatField(blank=True, null=True)  # milliseconds
 

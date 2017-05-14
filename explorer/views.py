@@ -1,8 +1,12 @@
+import django
 import re
 import six
 from collections import Counter
 
-from django.core.urlresolvers import reverse_lazy
+if django.VERSION[1] >= 10:
+    from django.urls import reverse_lazy
+else:
+    from django.core.urlresolvers import reverse_lazy
 from django.db import DatabaseError
 from django.db.models import Count
 from django.forms.models import model_to_dict
@@ -359,8 +363,8 @@ def query_viewmodel(user, query, title=None, form=None, message=None, run_query=
         'total_rows': len(res.data) if has_valid_results else None,
         'duration': res.duration if has_valid_results else None,
         'has_stats': len([h for h in res.headers if h.summary]) if has_valid_results else False,
-        'bucket': app_settings.S3_BUCKET,
         'snapshots': query.snapshots if query.snapshot else [],
-        'ql_id': ql.id if ql else None
+        'ql_id': ql.id if ql else None,
+        'unsafe_rendering': app_settings.UNSAFE_RENDERING,
     }
     return ret
